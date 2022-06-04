@@ -3,6 +3,7 @@ from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 from tensorflow.keras.preprocessing.image import img_to_array
 from tensorflow.keras.models import load_model
 from imutils.video import VideoStream
+import requests
 import numpy as np
 import imutils
 import time
@@ -14,6 +15,7 @@ from time import sleep
 import RPi.GPIO as GPIO
 from gpiozero import Servo
 
+TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbWluMSIsInR5cGUiOiJIQVJEV0FSRSIsImlhdCI6MTY1MzkyNzk0M30.atR5t5gi37JKyNgIqBQQD9d77quhYaMH3dCHu_51hx4"
 sensor_IR  = 16
 servo = Servo(25)
 
@@ -41,6 +43,14 @@ sensor = GY906.GY906(address,bus,units)
 #sensor2 = GY906.GY906(address,bus2,units)
 buzzer = Buzzer(17)
 
+server_url = "https://covid-scan-backend.herokuapp.com"
+def create_log(frame, temp, mask, token):
+    byte_io = cv2.imencode(".JPEG", frame)
+    data = io.TextIOWrapper(byte_io)
+
+    files = {"image": data, "temp": temp, "mask": mask}
+    headers = {"token": token}
+    return requests.post(server_url + "/hardware/scan-log", files=files, headers=headers)
 
 def detect_and_predict_mask(frame, faceNet, maskNet):
     # grab the dimensions of the frame and then construct a blob
@@ -155,14 +165,10 @@ while True:
                 print(label)
                 cv2.putText(frame, person_temp, (endX-10, endY), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 0, 0), 2)
                 cv2.rectangle(frame, (startX, startY), (endX, endY), color, 2)
+                create_log(frame, "{0:0.1f}".format(temp), label_1 == "Mask" if "true" else "false", TOKEN)
                 if label_1 == "Mask" and int(temp) < int(37):
                     #led 1 =1
                     GPIO.output(led_green,GPIO.HIGH)
-                    cv2.imwrite(str(image_path)+"/UID"+str(ID)+".jpg",frame)
-                    with open ('log_data/log.txt','a+') as f:
-                        f.write(time.asctime(time.localtime(time.time())))
-                        f.write(" "+"UID"+str(ID)+" "+str(label_1)+" "+str(person_temp))
-                        f.write("\n")
                     ID+=1
                     sleep(1)
                     servo.max()
@@ -172,11 +178,6 @@ while True:
                     pass
                 else:
                     GPIO.output(led_red,GPIO.HIGH)
-                    cv2.imwrite(str(image_path)+"/UID"+str(ID)+".jpg",frame)
-                    with open ('log_data/log.txt','a+') as f:
-                        f.write(time.asctime(time.localtime(time.time())))
-                        f.write(" "+"UID"+str(ID)+" "+str(label_1)+" "+str(person_temp))
-                        f.write("\n")
                     ID+=1
                     buzzer.on()
                     sleep(5)
