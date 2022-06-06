@@ -45,12 +45,11 @@ buzzer = Buzzer(17)
 
 server_url = "https://covid-scan-backend.herokuapp.com"
 def create_log(frame, temp, mask, token):
-    byte_io = cv2.imencode(".JPEG", frame)
-    data = io.TextIOWrapper(byte_io)
-
-    files = {"image": data, "temp": temp, "mask": mask}
+    _, byte_io = cv2.imencode(".JPEG", frame)
+    files = {"image": byte_io}
     headers = {"token": token}
-    return requests.post(server_url + "/hardware/scan-log", files=files, headers=headers)
+    data = {"temp": temp, "mask": mask}
+    return requests.post(server_url + "/hardware/scan-log", files=files, data=data, headers=headers)
 
 def detect_and_predict_mask(frame, faceNet, maskNet):
     # grab the dimensions of the frame and then construct a blob
